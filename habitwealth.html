@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HabitWealth by UrTouch</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+        .dark-mode {
+            background: linear-gradient(to bottom right, #111827, #1f2937, #111827);
+        }
+        .light-mode {
+            background: linear-gradient(to bottom right, #faf5ff, #fce7f3, #eff6ff);
+        }
+    </style>
+</head>
+<body class="dark-mode min-h-screen p-4">
+    <div id="app" class="max-w-7xl mx-auto"></div>
+
+    <script>
+        // App State
+        let state = {
+            activeTab: 'dashboard',
+            timeframe: 'monthly',
+            darkMode: true,
+            colorScheme: 'purple',
+            showCustomizeDropdown: false,
+            dashboardWidgets: {
+                income: true, expenses: true, remaining: true, debts: true,
+                investments: true, crypto: true, accounts: true, overview: true,
+                goals: true, purchases: true
+            },
+            accounts: [
+                { id: 1, name: 'Checking', balance: 2500, color: '#8B5CF6' },
+                { id: 2, name: 'Savings', balance: 5000, color: '#10B981' }
+            ],
+            income: [{ id: 1, source: 'Salary', amount: 5000, frequency: 'monthly' }],
+            expenses: [
+                { id: 1, category: 'Housing', amount: 1500, frequency: 'monthly', dueDate: '2025-01-01' },
+                { id: 2, category: 'Food', amount: 600, frequency: 'monthly', dueDate: '2025-01-15' }
+            ],
+            savingsGoals: [{ id: 1, name: 'Emergency Fund', target: 10000, current: 5000, deadline: '2025-12-31' }],
+            debts: [{ id: 1, creditor: 'Medical Bill', amount: 3000, status: 'collections', notes: 'Payment plan available', debtType: 'Medical', dateCreated: '2024-03-15' }],
+            purchases: [{ id: 1, date: '2025-12-20', item: 'Groceries', amount: 85.50, account: 'Checking', category: 'Food' }],
+            incomeEntries: [
+                { id: 1, source: 'Paycheck', amount: 1250, date: '2025-12-06', category: 'Salary', account: '' },
+                { id: 2, source: 'Paycheck', amount: 1300, date: '2025-12-20', category: 'Salary', account: '' }
+            ],
+            investments: [{ id: 1, name: '401k', type: 'Retirement', amount: 50000, return: 8.5, contributions: 500, frequency: 'monthly', account: 'Checking' }],
+            crypto: [{ id: 1, name: 'Bitcoin', symbol: 'BTC', quantity: 0.5, purchasePrice: 40000, currentPrice: 45000, platform: 'Coinbase', account: 'Checking', recurring: false, frequency: 'monthly', recurringAmount: 0 }]
+        };
+
+        // Load from localStorage
+        function loadData() {
+            const saved = localStorage.getItem('habitWealthData');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                state = { ...state, ...parsed };
+            }
+        }
+
+        // Save to localStorage
+        function saveData() {
+            localStorage.setItem('habitWealthData', JSON.stringify(state));
+        }
+
+        // Color schemes
+        const colorSchemes = {
+            purple: { gradient: 'from-purple-600 to-pink-600', darkGradient: 'from-purple-900 via-pink-900 to-blue-900' },
+            blue: { gradient: 'from-blue-600 to-cyan-600', darkGradient: 'from-blue-900 via-cyan-900 to-blue-900' },
+            green: { gradient: 'from-green-600 to-emerald-600', darkGradient: 'from-green-900 via-emerald-900 to-green-900' },
+            orange: { gradient: 'from-orange-600 to-red-600', darkGradient: 'from-orange-900 via-red-900 to-orange-900' },
+            pink: { gradient: 'from-pink-600 to-rose-600', darkGradient: 'from-pink-900 via-rose-900 to-pink-900' }
+        };
+
+        // Calculate totals
+        function calculateTotals() {
+            const filteredIncome = filterByTimeframe(state.income);
+            const filteredExpenses = filterByTimeframe(state.expenses);
+            
+            const totalIncome = filteredIncome.reduce((sum, i) => sum + i.adjustedAmount, 0);
+            const totalExpenses = filteredExpenses.reduce((sum, e) => sum + e.adjustedAmount, 0);
+            const totalDebts = state.debts.reduce((sum, d) => sum + d.amount, 0);
+            const monthlyPurchases = state.purchases.reduce((sum, p) => sum + p.amount, 0);
+            const totalInvestments = state.investments.reduce((sum, i) => sum + i.amount, 0);
+            const totalCryptoValue = state.crypto.reduce((sum, c) => sum + (c.quantity * c.currentPrice), 0);
+            const cryptoGainLoss = state.crypto.reduce((sum, c) => sum + ((c.currentPrice - c.purchasePrice) * c.quantity), 0);
+            const actualIncome = state.incomeEntries.reduce((sum, e) => sum + e.amount, 0);
+            
+            return { 
+                totalIncome, totalExpenses, totalDebts, monthlyPurchases,
+                totalInvestments, totalCryptoValue, cryptoGainLoss, actualIncome,
+                remaining: totalIncome - totalExpenses,
+                filteredIncome, filteredExpenses
+            };
+        }
+
+        // Filter by timeframe
+        function filterByTimeframe(items) {
+            return items.map(item => {
+                let adjustedAmount = item.amount;
+                const tf = state.timeframe;
+                const freq = item.frequency;
+
+                if (freq === 'daily') {
+                    if (tf === 'daily') adjustedAmount = item.amount;
+                    else if (tf === 'weekly') adjustedAmount = item.amount * 7;
+                    else if (tf === 'biweekly') adjustedAmount = item.amount * 14;
+                    else if (tf === 'monthly') adjustedAmount = item.amount * 30;
+                    else if (tf === 'quarterly') adjustedAmount = item.amount * 90;
+                } else if (freq === 'weekly') {
+                    if (tf === 'daily') adjustedAmount = item.amount / 7;
+                    else if (tf === 'weekly') adjustedAmount = item.amount;
+                    else if (tf === 'biweekly') adjustedAmount = item.amount * 2;
+                    else if (tf === 'monthly') adjustedAmount = item.amount * 4;
+                    else if (tf === 'quarterly') adjustedAmount = item.amount * 12;
+                } else if (freq === 'biweekly') {
+                    if (tf === 'daily') adjustedAmount = item.amount / 14;
+                    else if (tf === 'weekly') adjustedAmount = item.amount / 2;
+                    else if (tf === 'biweekly') adjustedAmount = item.amount;
+                    else if (tf === 'monthly') adjustedAmount = item.amount * 2;
+                    else if (tf === 'quarterly') adjustedAmount = item.amount * 6;
+                } else if (freq === 'monthly') {
+                    if (tf === 'daily') adjustedAmount = item.amount / 30;
+                    else if (tf === 'weekly') adjustedAmount = item.amount / 4;
+                    else if (tf === 'biweekly') adjustedAmount = item.amount / 2;
+                    else if (tf === 'monthly') adjustedAmount = item.amount;
+                    else if (tf === 'quarterly') adjustedAmount = item.amount * 3;
+                } else if (freq === 'quarterly') {
+                    if (tf === 'daily') adjustedAmount = item.amount / 90;
+                    else if (tf === 'weekly') adjustedAmount = item.amount / 12;
+                    else if (tf === 'biweekly') adjustedAmount = item.amount / 6;
+                    else if (tf === 'monthly') adjustedAmount = item.amount / 3;
+                    else if (tf === 'quarterly') adjustedAmount = item.amount;
+                }
+                
+                return { ...item, adjustedAmount };
+            });
+        }
+
+        // Export data
+        function exportData() {
+            const data = {
+                ...state,
+                exportDate: new Date().toISOString()
+            };
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `habitwealth-export-${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+        }
+
+        // Render app
+        function render() {
+            const totals = calculateTotals();
+            const scheme = colorSchemes[state.colorScheme];
+            
+            document.getElementById('app').innerHTML = `
+                <!-- Header -->
+                <div class="bg-gradient-to-r ${state.darkMode ? scheme.darkGradient : scheme.gradient} rounded-3xl shadow-2xl p-8 mb-6 ${state.darkMode ? 'border border-purple-700' : ''}">
+                    <div class="flex items-center justify-between flex-wrap gap-4">
+                        <div>
+                            <h1 class="text-4xl font-bold text-white mb-2">💰 HabitWealth by UrTouch</h1>
+                            <p class="${state.darkMode ? 'text-purple-200' : 'text-purple-100'}">Secure your future. Transform habits. Rewrite your story. Grow beyond limits.</p>
+                        </div>
+                        <div class="flex gap-3 flex-wrap">
+                            <button onclick="cycleColorScheme()" class="px-6 py-3 rounded-full font-semibold shadow-lg hover:shadow-xl transition-all ${state.darkMode ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-white text-gray-800 hover:bg-gray-50'}">
+                                🎨 Colors
+                            </button>
+                            <button onclick="toggleDarkMode()" class="px-6 py-3 rounded-full font-semibold shadow-lg hover:shadow-xl transition-all ${state.darkMode ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-white text-purple-600 hover:bg-purple-50'}">
+                                ${state.darkMode ? '☀️ Light' : '🌙 Dark'}
+                            </button>
+                            <button onclick="exportData()" class="px-6 py-3 rounded-full font-semibold shadow-lg hover:shadow-xl transition-all ${state.darkMode ? 'bg-white text-purple-900 hover:bg-purple-50' : 'bg-white text-purple-600 hover:bg-purple-50'}">
+                                💾 Export Data
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Simple Dashboard -->
+                <div class="${state.darkMode ? 'bg-gray-800 border border-gray-700' : 'bg-white'} rounded-2xl shadow-xl p-8">
+                    <h2 class="text-3xl font-bold ${state.darkMode ? 'text-white' : 'text-gray-800'} mb-6">Dashboard</h2>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div class="bg-gradient-to-br from-green-400 to-green-600 rounded-2xl p-6 text-white shadow-xl">
+                            <h3 class="text-lg font-semibold mb-2">💵 Income</h3>
+                            <p class="text-4xl font-bold">$${totals.totalIncome.toFixed(2)}</p>
+                            <p class="text-sm mt-1 opacity-90">${state.timeframe}</p>
+                        </div>
+                        
+                        <div class="bg-gradient-to-br from-red-400 to-red-600 rounded-2xl p-6 text-white shadow-xl">
+                            <h3 class="text-lg font-semibold mb-2">📊 Expenses</h3>
+                            <p class="text-4xl font-bold">$${totals.totalExpenses.toFixed(2)}</p>
+                            <p class="text-sm mt-1 opacity-90">${state.timeframe}</p>
+                        </div>
+                        
+                        <div class="bg-gradient-to-br from-blue-400 to-blue-600 rounded-2xl p-6 text-white shadow-xl">
+                            <h3 class="text-lg font-semibold mb-2">💰 Remaining</h3>
+                            <p class="text-4xl font-bold">$${totals.remaining.toFixed(2)}</p>
+                            <p class="text-sm mt-1 opacity-90">${state.timeframe}</p>
+                        </div>
+                        
+                        <div class="bg-gradient-to-br from-orange-400 to-orange-600 rounded-2xl p-6 text-white shadow-xl">
+                            <h3 class="text-lg font-semibold mb-2">⚠️ Total Debts</h3>
+                            <p class="text-4xl font-bold">$${totals.totalDebts.toFixed(2)}</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                        <div class="bg-gradient-to-br from-purple-400 to-purple-600 rounded-2xl p-6 text-white shadow-xl">
+                            <h3 class="text-lg font-semibold mb-2">📈 Investments</h3>
+                            <p class="text-4xl font-bold">$${totals.totalInvestments.toFixed(2)}</p>
+                        </div>
+                        
+                        <div class="bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-2xl p-6 text-white shadow-xl">
+                            <h3 class="text-lg font-semibold mb-2">₿ Crypto Value</h3>
+                            <p class="text-4xl font-bold">$${totals.totalCryptoValue.toFixed(2)}</p>
+                            <p class="text-sm mt-2 ${totals.cryptoGainLoss >= 0 ? 'text-green-100' : 'text-red-100'}">
+                                ${totals.cryptoGainLoss >= 0 ? '▲' : '▼'} $${Math.abs(totals.cryptoGainLoss).toFixed(2)} ${totals.cryptoGainLoss >= 0 ? 'gain' : 'loss'}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="${state.darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-2xl p-6 mt-6">
+                        <h3 class="text-2xl font-bold ${state.darkMode ? 'text-white' : 'text-gray-800'} mb-4">Account Balances</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            ${state.accounts.map(acc => `
+                                <div class="p-4 rounded-xl" style="background-color: ${acc.color}20;">
+                                    <p class="${state.darkMode ? 'text-gray-200' : 'text-gray-700'} font-medium">${acc.name}</p>
+                                    <p class="text-3xl font-bold mt-2" style="color: ${acc.color}">$${acc.balance.toFixed(2)}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <div class="${state.darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-2xl p-6 mt-6">
+                        <h3 class="text-xl font-bold ${state.darkMode ? 'text-white' : 'text-gray-800'} mb-4">Quick Add</h3>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <button onclick="state.activeTab='ledger'; render();" class="bg-gradient-to-r ${scheme.gradient} text-white px-4 py-3 rounded-xl font-semibold shadow-lg">+ Account</button>
+                            <button onclick="state.activeTab='budget'; render();" class="bg-gradient-to-r ${scheme.gradient} text-white px-4 py-3 rounded-xl font-semibold shadow-lg">+ Income</button>
+                            <button onclick="state.activeTab='budget'; render();" class="bg-gradient-to-r ${scheme.gradient} text-white px-4 py-3 rounded-xl font-semibold shadow-lg">+ Expense</button>
+                            <button onclick="state.activeTab='purchases'; render();" class="bg-gradient-to-r ${scheme.gradient} text-white px-4 py-3 rounded-xl font-semibold shadow-lg">+ Purchase</button>
+                        </div>
+                    </div>
+
+                    <p class="text-center ${state.darkMode ? 'text-gray-400' : 'text-gray-600'} mt-8 text-sm">
+                        💾 Your data is automatically saved in your browser. Use Export Data to create backups!
+                    </p>
+                </div>
+            `;
+            
+            saveData();
+        }
+
+        // Toggle functions
+        function toggleDarkMode() {
+            state.darkMode = !state.darkMode;
+            document.body.className = state.darkMode ? 'dark-mode min-h-screen p-4' : 'light-mode min-h-screen p-4';
+            render();
+        }
+
+        function cycleColorScheme() {
+            const schemes = ['purple', 'blue', 'green', 'orange', 'pink'];
+            const currentIndex = schemes.indexOf(state.colorScheme);
+            state.colorScheme = schemes[(currentIndex + 1) % schemes.length];
+            render();
+        }
+
+        // Initialize
+        loadData();
+        render();
+    </script>
+</body>
+</html>
