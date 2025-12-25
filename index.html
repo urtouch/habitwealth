@@ -5,274 +5,959 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HabitWealth by UrTouch</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-        }
-        .dark-mode {
-            background: linear-gradient(to bottom right, #111827, #1f2937, #111827);
-        }
-        .light-mode {
-            background: linear-gradient(to bottom right, #faf5ff, #fce7f3, #eff6ff);
-        }
-    </style>
 </head>
-<body class="dark-mode min-h-screen p-4">
+<body class="min-h-screen p-4" id="body">
     <div id="app" class="max-w-7xl mx-auto"></div>
 
     <script>
-        // App State
-        let state = {
-            activeTab: 'dashboard',
-            timeframe: 'monthly',
-            darkMode: true,
-            colorScheme: 'purple',
-            showCustomizeDropdown: false,
-            dashboardWidgets: {
-                income: true, expenses: true, remaining: true, debts: true,
-                investments: true, crypto: true, accounts: true, overview: true,
-                goals: true, purchases: true
-            },
-            accounts: [
-                { id: 1, name: 'Checking', balance: 2500, color: '#8B5CF6' },
-                { id: 2, name: 'Savings', balance: 5000, color: '#10B981' }
-            ],
-            income: [{ id: 1, source: 'Salary', amount: 5000, frequency: 'monthly' }],
-            expenses: [
-                { id: 1, category: 'Housing', amount: 1500, frequency: 'monthly', dueDate: '2025-01-01' },
-                { id: 2, category: 'Food', amount: 600, frequency: 'monthly', dueDate: '2025-01-15' }
-            ],
-            savingsGoals: [{ id: 1, name: 'Emergency Fund', target: 10000, current: 5000, deadline: '2025-12-31' }],
-            debts: [{ id: 1, creditor: 'Medical Bill', amount: 3000, status: 'collections', notes: 'Payment plan available', debtType: 'Medical', dateCreated: '2024-03-15' }],
-            purchases: [{ id: 1, date: '2025-12-20', item: 'Groceries', amount: 85.50, account: 'Checking', category: 'Food' }],
-            incomeEntries: [
-                { id: 1, source: 'Paycheck', amount: 1250, date: '2025-12-06', category: 'Salary', account: '' },
-                { id: 2, source: 'Paycheck', amount: 1300, date: '2025-12-20', category: 'Salary', account: '' }
-            ],
-            investments: [{ id: 1, name: '401k', type: 'Retirement', amount: 50000, return: 8.5, contributions: 500, frequency: 'monthly', account: 'Checking' }],
-            crypto: [{ id: 1, name: 'Bitcoin', symbol: 'BTC', quantity: 0.5, purchasePrice: 40000, currentPrice: 45000, platform: 'Coinbase', account: 'Checking', recurring: false, frequency: 'monthly', recurringAmount: 0 }]
-        };
+        // Load or initialize state
+        let state = localStorage.getItem('habitWealthData') 
+            ? JSON.parse(localStorage.getItem('habitWealthData'))
+            : {
+                activeTab: 'dashboard',
+                timeframe: 'monthly',
+                darkMode: true,
+                accounts: [
+                    { id: 1, name: 'Checking', balance: 2500, color: '#8B5CF6' },
+                    { id: 2, name: 'Savings', balance: 5000, color: '#10B981' }
+                ],
+                income: [{ id: 1, source: 'Salary', amount: 5000, frequency: 'monthly' }],
+                expenses: [{ id: 1, category: 'Housing', amount: 1500, frequency: 'monthly', dueDate: '2025-01-01' }],
+                purchases: [],
+                debts: [],
+                savingsGoals: [{ id: 1, name: 'Emergency Fund', target: 10000, current: 5000, deadline: '2025-12-31' }],
+                investments: [],
+                crypto: [],
+                incomeEntries: []
+            };
 
-        // Load from localStorage
-        function loadData() {
-            const saved = localStorage.getItem('habitWealthData');
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                state = { ...state, ...parsed };
-            }
-        }
-
-        // Save to localStorage
-        function saveData() {
+        function save() {
             localStorage.setItem('habitWealthData', JSON.stringify(state));
         }
 
-        // Color schemes
-        const colorSchemes = {
-            purple: { gradient: 'from-purple-600 to-pink-600', darkGradient: 'from-purple-900 via-pink-900 to-blue-900' },
-            blue: { gradient: 'from-blue-600 to-cyan-600', darkGradient: 'from-blue-900 via-cyan-900 to-blue-900' },
-            green: { gradient: 'from-green-600 to-emerald-600', darkGradient: 'from-green-900 via-emerald-900 to-green-900' },
-            orange: { gradient: 'from-orange-600 to-red-600', darkGradient: 'from-orange-900 via-red-900 to-orange-900' },
-            pink: { gradient: 'from-pink-600 to-rose-600', darkGradient: 'from-pink-900 via-rose-900 to-pink-900' }
-        };
-
-        // Calculate totals
-        function calculateTotals() {
-            const filteredIncome = filterByTimeframe(state.income);
-            const filteredExpenses = filterByTimeframe(state.expenses);
-            
-            const totalIncome = filteredIncome.reduce((sum, i) => sum + i.adjustedAmount, 0);
-            const totalExpenses = filteredExpenses.reduce((sum, e) => sum + e.adjustedAmount, 0);
-            const totalDebts = state.debts.reduce((sum, d) => sum + d.amount, 0);
-            const monthlyPurchases = state.purchases.reduce((sum, p) => sum + p.amount, 0);
-            const totalInvestments = state.investments.reduce((sum, i) => sum + i.amount, 0);
-            const totalCryptoValue = state.crypto.reduce((sum, c) => sum + (c.quantity * c.currentPrice), 0);
-            const cryptoGainLoss = state.crypto.reduce((sum, c) => sum + ((c.currentPrice - c.purchasePrice) * c.quantity), 0);
-            const actualIncome = state.incomeEntries.reduce((sum, e) => sum + e.amount, 0);
-            
-            return { 
-                totalIncome, totalExpenses, totalDebts, monthlyPurchases,
-                totalInvestments, totalCryptoValue, cryptoGainLoss, actualIncome,
-                remaining: totalIncome - totalExpenses,
-                filteredIncome, filteredExpenses
-            };
-        }
-
-        // Filter by timeframe
-        function filterByTimeframe(items) {
-            return items.map(item => {
-                let adjustedAmount = item.amount;
-                const tf = state.timeframe;
-                const freq = item.frequency;
-
-                if (freq === 'daily') {
-                    if (tf === 'daily') adjustedAmount = item.amount;
-                    else if (tf === 'weekly') adjustedAmount = item.amount * 7;
-                    else if (tf === 'biweekly') adjustedAmount = item.amount * 14;
-                    else if (tf === 'monthly') adjustedAmount = item.amount * 30;
-                    else if (tf === 'quarterly') adjustedAmount = item.amount * 90;
-                } else if (freq === 'weekly') {
-                    if (tf === 'daily') adjustedAmount = item.amount / 7;
-                    else if (tf === 'weekly') adjustedAmount = item.amount;
-                    else if (tf === 'biweekly') adjustedAmount = item.amount * 2;
-                    else if (tf === 'monthly') adjustedAmount = item.amount * 4;
-                    else if (tf === 'quarterly') adjustedAmount = item.amount * 12;
-                } else if (freq === 'biweekly') {
-                    if (tf === 'daily') adjustedAmount = item.amount / 14;
-                    else if (tf === 'weekly') adjustedAmount = item.amount / 2;
-                    else if (tf === 'biweekly') adjustedAmount = item.amount;
-                    else if (tf === 'monthly') adjustedAmount = item.amount * 2;
-                    else if (tf === 'quarterly') adjustedAmount = item.amount * 6;
-                } else if (freq === 'monthly') {
-                    if (tf === 'daily') adjustedAmount = item.amount / 30;
-                    else if (tf === 'weekly') adjustedAmount = item.amount / 4;
-                    else if (tf === 'biweekly') adjustedAmount = item.amount / 2;
-                    else if (tf === 'monthly') adjustedAmount = item.amount;
-                    else if (tf === 'quarterly') adjustedAmount = item.amount * 3;
-                } else if (freq === 'quarterly') {
-                    if (tf === 'daily') adjustedAmount = item.amount / 90;
-                    else if (tf === 'weekly') adjustedAmount = item.amount / 12;
-                    else if (tf === 'biweekly') adjustedAmount = item.amount / 6;
-                    else if (tf === 'monthly') adjustedAmount = item.amount / 3;
-                    else if (tf === 'quarterly') adjustedAmount = item.amount;
-                }
-                
-                return { ...item, adjustedAmount };
-            });
-        }
-
-        // Export data
-        function exportData() {
-            const data = {
-                ...state,
-                exportDate: new Date().toISOString()
-            };
-            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `habitwealth-export-${new Date().toISOString().split('T')[0]}.json`;
-            a.click();
-        }
-
-        // Render app
-        function render() {
-            const totals = calculateTotals();
-            const scheme = colorSchemes[state.colorScheme];
-            
-            document.getElementById('app').innerHTML = `
-                <!-- Header -->
-                <div class="bg-gradient-to-r ${state.darkMode ? scheme.darkGradient : scheme.gradient} rounded-3xl shadow-2xl p-8 mb-6 ${state.darkMode ? 'border border-purple-700' : ''}">
-                    <div class="flex items-center justify-between flex-wrap gap-4">
-                        <div>
-                            <h1 class="text-4xl font-bold text-white mb-2">💰 HabitWealth by UrTouch</h1>
-                            <p class="${state.darkMode ? 'text-purple-200' : 'text-purple-100'}">Secure your future. Transform habits. Rewrite your story. Grow beyond limits.</p>
-                        </div>
-                        <div class="flex gap-3 flex-wrap">
-                            <button onclick="cycleColorScheme()" class="px-6 py-3 rounded-full font-semibold shadow-lg hover:shadow-xl transition-all ${state.darkMode ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-white text-gray-800 hover:bg-gray-50'}">
-                                🎨 Colors
-                            </button>
-                            <button onclick="toggleDarkMode()" class="px-6 py-3 rounded-full font-semibold shadow-lg hover:shadow-xl transition-all ${state.darkMode ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-white text-purple-600 hover:bg-purple-50'}">
-                                ${state.darkMode ? '☀️ Light' : '🌙 Dark'}
-                            </button>
-                            <button onclick="exportData()" class="px-6 py-3 rounded-full font-semibold shadow-lg hover:shadow-xl transition-all ${state.darkMode ? 'bg-white text-purple-900 hover:bg-purple-50' : 'bg-white text-purple-600 hover:bg-purple-50'}">
-                                💾 Export Data
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Simple Dashboard -->
-                <div class="${state.darkMode ? 'bg-gray-800 border border-gray-700' : 'bg-white'} rounded-2xl shadow-xl p-8">
-                    <h2 class="text-3xl font-bold ${state.darkMode ? 'text-white' : 'text-gray-800'} mb-6">Dashboard</h2>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        <div class="bg-gradient-to-br from-green-400 to-green-600 rounded-2xl p-6 text-white shadow-xl">
-                            <h3 class="text-lg font-semibold mb-2">💵 Income</h3>
-                            <p class="text-4xl font-bold">$${totals.totalIncome.toFixed(2)}</p>
-                            <p class="text-sm mt-1 opacity-90">${state.timeframe}</p>
-                        </div>
-                        
-                        <div class="bg-gradient-to-br from-red-400 to-red-600 rounded-2xl p-6 text-white shadow-xl">
-                            <h3 class="text-lg font-semibold mb-2">📊 Expenses</h3>
-                            <p class="text-4xl font-bold">$${totals.totalExpenses.toFixed(2)}</p>
-                            <p class="text-sm mt-1 opacity-90">${state.timeframe}</p>
-                        </div>
-                        
-                        <div class="bg-gradient-to-br from-blue-400 to-blue-600 rounded-2xl p-6 text-white shadow-xl">
-                            <h3 class="text-lg font-semibold mb-2">💰 Remaining</h3>
-                            <p class="text-4xl font-bold">$${totals.remaining.toFixed(2)}</p>
-                            <p class="text-sm mt-1 opacity-90">${state.timeframe}</p>
-                        </div>
-                        
-                        <div class="bg-gradient-to-br from-orange-400 to-orange-600 rounded-2xl p-6 text-white shadow-xl">
-                            <h3 class="text-lg font-semibold mb-2">⚠️ Total Debts</h3>
-                            <p class="text-4xl font-bold">$${totals.totalDebts.toFixed(2)}</p>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                        <div class="bg-gradient-to-br from-purple-400 to-purple-600 rounded-2xl p-6 text-white shadow-xl">
-                            <h3 class="text-lg font-semibold mb-2">📈 Investments</h3>
-                            <p class="text-4xl font-bold">$${totals.totalInvestments.toFixed(2)}</p>
-                        </div>
-                        
-                        <div class="bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-2xl p-6 text-white shadow-xl">
-                            <h3 class="text-lg font-semibold mb-2">₿ Crypto Value</h3>
-                            <p class="text-4xl font-bold">$${totals.totalCryptoValue.toFixed(2)}</p>
-                            <p class="text-sm mt-2 ${totals.cryptoGainLoss >= 0 ? 'text-green-100' : 'text-red-100'}">
-                                ${totals.cryptoGainLoss >= 0 ? '▲' : '▼'} $${Math.abs(totals.cryptoGainLoss).toFixed(2)} ${totals.cryptoGainLoss >= 0 ? 'gain' : 'loss'}
-                            </p>
-                        </div>
-                    </div>
-
-                    <div class="${state.darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-2xl p-6 mt-6">
-                        <h3 class="text-2xl font-bold ${state.darkMode ? 'text-white' : 'text-gray-800'} mb-4">Account Balances</h3>
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            ${state.accounts.map(acc => `
-                                <div class="p-4 rounded-xl" style="background-color: ${acc.color}20;">
-                                    <p class="${state.darkMode ? 'text-gray-200' : 'text-gray-700'} font-medium">${acc.name}</p>
-                                    <p class="text-3xl font-bold mt-2" style="color: ${acc.color}">$${acc.balance.toFixed(2)}</p>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-
-                    <div class="${state.darkMode ? 'bg-gray-700' : 'bg-gray-50'} rounded-2xl p-6 mt-6">
-                        <h3 class="text-xl font-bold ${state.darkMode ? 'text-white' : 'text-gray-800'} mb-4">Quick Add</h3>
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            <button onclick="state.activeTab='ledger'; render();" class="bg-gradient-to-r ${scheme.gradient} text-white px-4 py-3 rounded-xl font-semibold shadow-lg">+ Account</button>
-                            <button onclick="state.activeTab='budget'; render();" class="bg-gradient-to-r ${scheme.gradient} text-white px-4 py-3 rounded-xl font-semibold shadow-lg">+ Income</button>
-                            <button onclick="state.activeTab='budget'; render();" class="bg-gradient-to-r ${scheme.gradient} text-white px-4 py-3 rounded-xl font-semibold shadow-lg">+ Expense</button>
-                            <button onclick="state.activeTab='purchases'; render();" class="bg-gradient-to-r ${scheme.gradient} text-white px-4 py-3 rounded-xl font-semibold shadow-lg">+ Purchase</button>
-                        </div>
-                    </div>
-
-                    <p class="text-center ${state.darkMode ? 'text-gray-400' : 'text-gray-600'} mt-8 text-sm">
-                        💾 Your data is automatically saved in your browser. Use Export Data to create backups!
-                    </p>
-                </div>
-            `;
-            
-            saveData();
-        }
-
-        // Toggle functions
-        function toggleDarkMode() {
-            state.darkMode = !state.darkMode;
-            document.body.className = state.darkMode ? 'dark-mode min-h-screen p-4' : 'light-mode min-h-screen p-4';
+        function setTab(tab) {
+            state.activeTab = tab;
             render();
         }
 
-        function cycleColorScheme() {
-            const schemes = ['purple', 'blue', 'green', 'orange', 'pink'];
-            const currentIndex = schemes.indexOf(state.colorScheme);
-            state.colorScheme = schemes[(currentIndex + 1) % schemes.length];
+        function addGoal() {
+            const name = document.getElementById('goalName').value;
+            const target = parseFloat(document.getElementById('goalTarget').value);
+            const current = parseFloat(document.getElementById('goalCurrent').value) || 0;
+            const deadline = document.getElementById('goalDeadline').value;
+            
+            if (!name || !target) return alert('Please enter goal name and target');
+            
+            state.savingsGoals.push({ id: Date.now(), name, target, current, deadline });
+            
+            document.getElementById('goalName').value = '';
+            document.getElementById('goalTarget').value = '';
+            document.getElementById('goalCurrent').value = '';
+            document.getElementById('goalDeadline').value = '';
+            render();
+        }
+
+        function toggleCustomDebtType() {
+            const select = document.getElementById('debtType');
+            const custom = document.getElementById('debtCustomType');
+            custom.style.display = select.value === 'Other' ? 'block' : 'none';
+        }
+
+        function addDebt() {
+            const cred = document.getElementById('debtCred').value;
+            const amt = parseFloat(document.getElementById('debtAmt').value);
+            const type = document.getElementById('debtType').value;
+            const customType = document.getElementById('debtCustomType').value;
+            const date = document.getElementById('debtDate').value;
+            const status = document.getElementById('debtStatus').value;
+            const notes = document.getElementById('debtNotes').value;
+            
+            if (!cred || !amt) return alert('Please enter creditor and amount');
+            
+            const finalType = type === 'Other' && customType ? customType : type;
+            
+            state.debts.push({ 
+                id: Date.now(), 
+                creditor: cred, 
+                amount: amt, 
+                debtType: finalType,
+                dateCreated: date,
+                status,
+                notes
+            });
+            
+            document.getElementById('debtCred').value = '';
+            document.getElementById('debtAmt').value = '';
+            document.getElementById('debtType').value = '';
+            document.getElementById('debtCustomType').value = '';
+            document.getElementById('debtDate').value = '';
+            document.getElementById('debtNotes').value = '';
+            document.getElementById('debtCustomType').style.display = 'none';
+            render();
+        }
+
+        function addInvestment() {
+            const name = document.getElementById('invName').value;
+            const type = document.getElementById('invType').value;
+            const amt = parseFloat(document.getElementById('invAmt').value);
+            const ret = parseFloat(document.getElementById('invReturn').value) || 0;
+            const contrib = parseFloat(document.getElementById('invContrib').value) || 0;
+            const freq = document.getElementById('invFreq').value;
+            const acc = document.getElementById('invAcc').value;
+            
+            if (!name || !amt) return alert('Please enter investment name and amount');
+            
+            state.investments.push({ 
+                id: Date.now(), 
+                name, 
+                type, 
+                amount: amt, 
+                return: ret, 
+                contributions: contrib,
+                frequency: freq,
+                account: acc
+            });
+            
+            document.getElementById('invName').value = '';
+            document.getElementById('invAmt').value = '';
+            document.getElementById('invReturn').value = '';
+            document.getElementById('invContrib').value = '';
+            document.getElementById('invAcc').value = '';
+            render();
+        }
+
+        function addCrypto() {
+            const name = document.getElementById('cryptoName').value;
+            const symbol = document.getElementById('cryptoSymbol').value;
+            const platform = document.getElementById('cryptoPlatform').value;
+            const qty = parseFloat(document.getElementById('cryptoQty').value);
+            const purchase = parseFloat(document.getElementById('cryptoPurchase').value) || 0;
+            const current = parseFloat(document.getElementById('cryptoCurrent').value) || 0;
+            const acc = document.getElementById('cryptoAcc').value;
+            
+            if (!name || !qty) return alert('Please enter crypto name and quantity');
+            
+            state.crypto.push({ 
+                id: Date.now(), 
+                name, 
+                symbol: symbol.toUpperCase(), 
+                platform,
+                quantity: qty, 
+                purchasePrice: purchase, 
+                currentPrice: current,
+                account: acc
+            });
+            
+            document.getElementById('cryptoName').value = '';
+            document.getElementById('cryptoSymbol').value = '';
+            document.getElementById('cryptoPlatform').value = '';
+            document.getElementById('cryptoQty').value = '';
+            document.getElementById('cryptoPurchase').value = '';
+            document.getElementById('cryptoCurrent').value = '';
+            document.getElementById('cryptoAcc').value = '';
+            render();
+        }
+
+        function toggleDark() {
+            state.darkMode = !state.darkMode;
+            document.getElementById('body').className = state.darkMode 
+                ? 'min-h-screen p-4 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900'
+                : 'min-h-screen p-4 bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50';
+            render();
+        }
+
+        function exportData() {
+            const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'habitwealth-' + new Date().toISOString().split('T')[0] + '.json';
+            a.click();
+        }
+
+        function addAccount() {
+            const name = document.getElementById('newAccName').value;
+            const bal = parseFloat(document.getElementById('newAccBal').value) || 0;
+            if (!name) return alert('Please enter account name');
+            
+            const colors = ['#EC4899', '#8B5CF6', '#10B981', '#F59E0B', '#EF4444', '#3B82F6'];
+            state.accounts.push({
+                id: Date.now(),
+                name: name,
+                balance: bal,
+                color: colors[state.accounts.length % colors.length]
+            });
+            document.getElementById('newAccName').value = '';
+            document.getElementById('newAccBal').value = '';
+            render();
+        }
+
+        function addIncomeEntry() {
+            const source = document.getElementById('incSource').value;
+            const amt = parseFloat(document.getElementById('incAmt').value);
+            const date = document.getElementById('incDate').value;
+            const cat = document.getElementById('incCat').value;
+            const acc = document.getElementById('incAcc').value;
+            
+            if (!source || !amt || !date) return alert('Please fill required fields');
+            
+            state.incomeEntries.push({ id: Date.now(), source, amount: amt, date, category: cat, account: acc });
+            
+            // Update account balance if specified
+            if (acc) {
+                const account = state.accounts.find(a => a.name === acc);
+                if (account) account.balance += amt;
+            }
+            
+            document.getElementById('incSource').value = '';
+            document.getElementById('incAmt').value = '';
+            document.getElementById('incDate').value = '';
+            document.getElementById('incAcc').value = '';
+            render();
+        }
+
+        function addExpense() {
+            const cat = document.getElementById('expCat').value;
+            const amt = parseFloat(document.getElementById('expAmt').value);
+            const freq = document.getElementById('expFreq').value;
+            const due = document.getElementById('expDue').value;
+            
+            if (!cat || !amt) return alert('Please fill category and amount');
+            
+            state.expenses.push({ id: Date.now(), category: cat, amount: amt, frequency: freq, dueDate: due });
+            
+            document.getElementById('expCat').value = '';
+            document.getElementById('expAmt').value = '';
+            document.getElementById('expDue').value = '';
+            render();
+        }
+
+        function addPurchase() {
+            const item = document.getElementById('pItem').value;
+            const amt = parseFloat(document.getElementById('pAmt').value);
+            const acc = document.getElementById('pAcc').value;
+            const date = document.getElementById('pDate').value;
+            const cat = document.getElementById('pCat').value;
+            
+            if (!item || !amt || !acc) return alert('Please fill required fields');
+            
+            state.purchases.push({ id: Date.now(), item, amount: amt, account: acc, date, category: cat });
+            
+            // Update account balance
+            const account = state.accounts.find(a => a.name === acc);
+            if (account) account.balance -= amt;
+            
+            document.getElementById('pItem').value = '';
+            document.getElementById('pAmt').value = '';
+            document.getElementById('pDate').value = '';
+            document.getElementById('pCat').value = '';
+            render();
+        }
+
+        function deleteItem(type, id) {
+            state[type] = state[type].filter(item => item.id !== id);
+            render();
+        }
+
+        function calcTotals() {
+            let totalInc = 0, totalExp = 0;
+            
+            state.income.forEach(inc => {
+                let amt = inc.amount;
+                if (inc.frequency === 'biweekly' && state.timeframe === 'monthly') amt *= 2;
+                else if (inc.frequency === 'weekly' && state.timeframe === 'monthly') amt *= 4;
+                else if (inc.frequency === 'quarterly' && state.timeframe === 'monthly') amt /= 3;
+                totalInc += amt;
+            });
+            
+            state.expenses.forEach(exp => {
+                let amt = exp.amount;
+                if (exp.frequency === 'biweekly' && state.timeframe === 'monthly') amt *= 2;
+                else if (exp.frequency === 'weekly' && state.timeframe === 'monthly') amt *= 4;
+                else if (exp.frequency === 'quarterly' && state.timeframe === 'monthly') amt /= 3;
+                totalExp += amt;
+            });
+            
+            return {
+                totalIncome: totalInc,
+                totalExpenses: totalExp,
+                remaining: totalInc - totalExp,
+                totalDebts: state.debts.reduce((s, d) => s + d.amount, 0),
+                totalInvestments: state.investments.reduce((s, i) => s + i.amount, 0),
+                totalCrypto: state.crypto.reduce((s, c) => s + (c.quantity * c.currentPrice), 0),
+                totalPurchases: state.purchases.reduce((s, p) => s + p.amount, 0)
+            };
+        }
+
+        function render() {
+            const totals = calcTotals();
+            const d = state.darkMode;
+            
+            document.getElementById('app').innerHTML = `
+                <!-- Header -->
+                <div class="bg-gradient-to-r ${d ? 'from-purple-900 via-pink-900 to-blue-900 border border-purple-700' : 'from-purple-600 via-pink-600 to-blue-600'} rounded-3xl shadow-2xl p-8 mb-6">
+                    <div class="flex justify-between items-center flex-wrap gap-4">
+                        <div>
+                            <h1 class="text-4xl font-bold text-white mb-2">💰 HabitWealth by UrTouch</h1>
+                            <p class="${d ? 'text-purple-200' : 'text-purple-100'}">Secure your future. Transform habits. Rewrite your story. Grow beyond limits.</p>
+                        </div>
+                        <div class="flex gap-3">
+                            <button onclick="toggleDark()" class="px-6 py-3 rounded-full font-semibold shadow-lg ${d ? 'bg-gray-700 text-white' : 'bg-white text-purple-600'}">
+                                ${d ? '☀️' : '🌙'} ${d ? 'Light' : 'Dark'}
+                            </button>
+                            <button onclick="exportData()" class="px-6 py-3 rounded-full font-semibold shadow-lg bg-white ${d ? 'text-purple-900' : 'text-purple-600'}">
+                                💾 Export
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Navigation -->
+                <div class="${d ? 'bg-gray-800 border border-gray-700' : 'bg-white'} rounded-2xl shadow-xl p-4 mb-6">
+                    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-9 gap-3">
+                        ${['dashboard', 'calendar', 'ledger', 'budget', 'goals', 'investments', 'crypto', 'debts', 'purchases'].map(tab => {
+                            const icons = {dashboard:'📊',calendar:'📅',ledger:'💳',budget:'💵',goals:'🎯',investments:'📈',crypto:'₿',debts:'⚠️',purchases:'🧾'};
+                            const labels = {goals: 'Funding My Future', calendar: 'Calendar'};
+                            return `
+                                <button onclick="setTab('${tab}')" class="flex flex-col items-center gap-2 p-4 rounded-xl font-semibold transition-all ${
+                                    state.activeTab === tab
+                                        ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg'
+                                        : d ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                }">
+                                    <span class="text-2xl">${icons[tab]}</span>
+                                    <span class="text-xs text-center">${labels[tab] || tab.charAt(0).toUpperCase() + tab.slice(1)}</span>
+                                </button>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+
+                <!-- Content -->
+                ${state.activeTab === 'dashboard' ? `
+                    <div class="space-y-6">
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                            <div class="bg-gradient-to-br from-green-400 to-green-600 rounded-2xl p-6 text-white shadow-xl">
+                                <h3 class="text-lg font-semibold mb-2">💵 Income</h3>
+                                <p class="text-4xl font-bold">$${totals.totalIncome.toFixed(2)}</p>
+                                <p class="text-sm opacity-90">${state.timeframe}</p>
+                            </div>
+                            <div class="bg-gradient-to-br from-red-400 to-red-600 rounded-2xl p-6 text-white shadow-xl">
+                                <h3 class="text-lg font-semibold mb-2">📊 Expenses</h3>
+                                <p class="text-4xl font-bold">$${totals.totalExpenses.toFixed(2)}</p>
+                                <p class="text-sm opacity-90">${state.timeframe}</p>
+                            </div>
+                            <div class="bg-gradient-to-br from-blue-400 to-blue-600 rounded-2xl p-6 text-white shadow-xl">
+                                <h3 class="text-lg font-semibold mb-2">💰 Remaining</h3>
+                                <p class="text-4xl font-bold">$${totals.remaining.toFixed(2)}</p>
+                            </div>
+                            <div class="bg-gradient-to-br from-orange-400 to-orange-600 rounded-2xl p-6 text-white shadow-xl">
+                                <h3 class="text-lg font-semibold mb-2">⚠️ Debts</h3>
+                                <p class="text-4xl font-bold">$${totals.totalDebts.toFixed(2)}</p>
+                            </div>
+                        </div>
+
+                        <div class="${d ? 'bg-gray-800 border border-gray-700' : 'bg-white'} rounded-2xl shadow-xl p-6">
+                            <h3 class="text-2xl font-bold ${d ? 'text-white' : 'text-gray-800'} mb-4">Account Balances</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                ${state.accounts.map(acc => `
+                                    <div class="p-4 rounded-xl cursor-pointer hover:scale-105 transition-transform" style="background-color: ${acc.color}20;" onclick="setTab('ledger')">
+                                        <p class="${d ? 'text-gray-200' : 'text-gray-700'} font-medium">${acc.name}</p>
+                                        <p class="text-3xl font-bold mt-2" style="color: ${acc.color}">$${acc.balance.toFixed(2)}</p>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+
+                        <div class="${d ? 'bg-gray-800 border border-gray-700 text-white' : 'bg-white text-gray-800'} rounded-2xl shadow-xl p-6 text-center">
+                            <p class="text-lg font-bold">✅ Data Auto-Saves!</p>
+                            <p class="text-sm ${d ? 'text-gray-400' : 'text-gray-600'} mt-2">Close your browser and reopen - your data will still be here. Use Export for backups!</p>
+                        </div>
+                    </div>
+                ` : state.activeTab === 'calendar' ? `
+                    <div class="${d ? 'bg-gray-800 border border-gray-700' : 'bg-white'} rounded-2xl shadow-xl p-6">
+                        <h2 class="text-2xl font-bold ${d ? 'text-white' : 'text-gray-800'} mb-6">📅 Financial Calendar</h2>
+                        
+                        <!-- Current Month Overview -->
+                        <div class="${d ? 'bg-gray-700' : 'bg-blue-50'} rounded-xl p-6 mb-6">
+                            <h3 class="text-xl font-bold ${d ? 'text-blue-400' : 'text-blue-600'} mb-4">
+                                ${new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                            </h3>
+                            
+                            <!-- Upcoming Income -->
+                            <div class="mb-6">
+                                <h4 class="font-semibold ${d ? 'text-green-400' : 'text-green-600'} mb-3">💵 Upcoming Income</h4>
+                                <div class="space-y-2">
+                                    ${state.incomeEntries
+                                        .sort((a, b) => new Date(a.date) - new Date(b.date))
+                                        .map(inc => {
+                                            const incDate = new Date(inc.date);
+                                            const today = new Date();
+                                            const daysAway = Math.ceil((incDate - today) / (1000*60*60*24));
+                                            return `
+                                                <div class="${d ? 'bg-gray-600' : 'bg-white'} p-3 rounded-lg flex justify-between items-center">
+                                                    <div>
+                                                        <p class="font-semibold ${d ? 'text-white' : 'text-gray-800'}">${inc.source}</p>
+                                                        <p class="text-sm ${d ? 'text-gray-400' : 'text-gray-600'}">
+                                                            ${inc.date} ${daysAway >= 0 ? '• In ' + daysAway + ' days' : '• ' + Math.abs(daysAway) + ' days ago'}
+                                                        </p>
+                                                    </div>
+                                                    <p class="text-lg font-bold text-green-600">${inc.amount.toFixed(2)}</p>
+                                                </div>
+                                            `;
+                                        }).join('') || `<p class="${d ? 'text-gray-400' : 'text-gray-500'} text-center py-4">No income entries scheduled</p>`}
+                                </div>
+                            </div>
+
+                            <!-- Bills Due -->
+                            <div>
+                                <h4 class="font-semibold ${d ? 'text-red-400' : 'text-red-600'} mb-3">📊 Bills Due</h4>
+                                <div class="space-y-2">
+                                    ${state.expenses
+                                        .filter(e => e.dueDate)
+                                        .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
+                                        .map(exp => {
+                                            const dueDate = new Date(exp.dueDate);
+                                            const today = new Date();
+                                            const daysUntil = Math.ceil((dueDate - today) / (1000*60*60*24));
+                                            const isOverdue = daysUntil < 0;
+                                            const isDueSoon = daysUntil >= 0 && daysUntil <= 7;
+                                            
+                                            return `
+                                                <div class="${d ? 'bg-gray-600' : 'bg-white'} p-3 rounded-lg flex justify-between items-center ${isOverdue ? 'border-l-4 border-red-500' : isDueSoon ? 'border-l-4 border-yellow-500' : ''}">
+                                                    <div>
+                                                        <p class="font-semibold ${d ? 'text-white' : 'text-gray-800'}">${exp.category}</p>
+                                                        <p class="text-sm ${d ? 'text-gray-400' : 'text-gray-600'}">
+                                                            ${exp.dueDate}
+                                                            ${isOverdue ? '• ⚠️ OVERDUE ' + Math.abs(daysUntil) + ' days' : 
+                                                              isDueSoon ? '• 🔔 Due in ' + daysUntil + ' days' : 
+                                                              '• In ' + daysUntil + ' days'}
+                                                        </p>
+                                                    </div>
+                                                    <p class="text-lg font-bold ${isOverdue ? 'text-red-600' : isDueSoon ? 'text-yellow-600' : 'text-gray-600'}">${exp.amount.toFixed(2)}</p>
+                                                </div>
+                                            `;
+                                        }).join('') || `<p class="${d ? 'text-gray-400' : 'text-gray-500'} text-center py-4">No bills with due dates</p>`}
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Monthly Summary -->
+                        <div class="${d ? 'bg-gray-700' : 'bg-purple-50'} rounded-xl p-6">
+                            <h3 class="text-xl font-bold ${d ? 'text-purple-400' : 'text-purple-600'} mb-4">📊 This Month's Summary</h3>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="${d ? 'bg-gray-600' : 'bg-white'} p-4 rounded-lg">
+                                    <p class="text-sm ${d ? 'text-gray-400' : 'text-gray-600'}">Expected Income</p>
+                                    <p class="text-2xl font-bold text-green-600">${state.incomeEntries.reduce((s,i) => s + i.amount, 0).toFixed(2)}</p>
+                                </div>
+                                <div class="${d ? 'bg-gray-600' : 'bg-white'} p-4 rounded-lg">
+                                    <p class="text-sm ${d ? 'text-gray-400' : 'text-gray-600'}">Bills Due</p>
+                                    <p class="text-2xl font-bold text-red-600">${state.expenses.reduce((s,e) => s + e.amount, 0).toFixed(2)}</p>
+                                </div>
+                                <div class="${d ? 'bg-gray-600' : 'bg-white'} p-4 rounded-lg">
+                                    <p class="text-sm ${d ? 'text-gray-400' : 'text-gray-600'}">Purchases Made</p>
+                                    <p class="text-2xl font-bold text-pink-600">${state.purchases.reduce((s,p) => s + p.amount, 0).toFixed(2)}</p>
+                                </div>
+                                <div class="${d ? 'bg-gray-600' : 'bg-white'} p-4 rounded-lg">
+                                    <p class="text-sm ${d ? 'text-gray-400' : 'text-gray-600'}">Net Flow</p>
+                                    <p class="text-2xl font-bold ${state.incomeEntries.reduce((s,i) => s + i.amount, 0) - state.expenses.reduce((s,e) => s + e.amount, 0) - state.purchases.reduce((s,p) => s + p.amount, 0) >= 0 ? 'text-green-600' : 'text-red-600'}">
+                                        ${(state.incomeEntries.reduce((s,i) => s + i.amount, 0) - state.expenses.reduce((s,e) => s + e.amount, 0) - state.purchases.reduce((s,p) => s + p.amount, 0)).toFixed(2)}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ` : state.activeTab === 'ledger' ? `
+                    <div class="${d ? 'bg-gray-800 border border-gray-700' : 'bg-white'} rounded-2xl shadow-xl p-6">
+                        <h2 class="text-2xl font-bold ${d ? 'text-white' : 'text-gray-800'} mb-6">💳 Bank Account Ledger</h2>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                            ${state.accounts.map(acc => {
+                                // Get transactions for this account
+                                const accPurchases = state.purchases.filter(p => p.account === acc.name);
+                                const accIncome = state.incomeEntries.filter(i => i.account === acc.name);
+                                const recentTransactions = [
+                                    ...accPurchases.map(p => ({ ...p, type: 'purchase', date: p.date })),
+                                    ...accIncome.map(i => ({ ...i, type: 'income', date: i.date }))
+                                ].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5);
+                                
+                                return `
+                                    <div class="rounded-2xl p-6 text-white shadow-lg relative" style="background: linear-gradient(135deg, ${acc.color}, ${acc.color}dd);">
+                                        <button onclick="deleteItem('accounts', ${acc.id})" class="absolute top-4 right-4 text-white hover:text-red-200 text-xl">🗑️</button>
+                                        <h3 class="text-2xl font-bold mb-4">${acc.name}</h3>
+                                        <p class="text-4xl font-bold mb-2">${acc.balance.toFixed(2)}</p>
+                                        <p class="text-sm opacity-90">Current Balance</p>
+                                        
+                                        ${recentTransactions.length > 0 ? `
+                                            <div class="mt-6 pt-4 border-t border-white border-opacity-30">
+                                                <p class="text-sm font-semibold mb-3 opacity-90">Recent Activity:</p>
+                                                <div class="space-y-2">
+                                                    ${recentTransactions.map(t => `
+                                                        <div class="flex justify-between items-center text-sm bg-white bg-opacity-20 rounded-lg p-2">
+                                                            <span>${t.type === 'purchase' ? '📤 ' + t.item : '📥 ' + t.source}</span>
+                                                            <span class="font-bold ${t.type === 'purchase' ? 'text-red-200' : 'text-green-200'}">
+                                                                ${t.type === 'purchase' ? '-' : '+'}${t.amount.toFixed(2)}
+                                                            </span>
+                                                        </div>
+                                                    `).join('')}
+                                                </div>
+                                                ${(accPurchases.length + accIncome.length) > 5 ? `
+                                                    <p class="text-xs mt-2 opacity-75 text-center">+${(accPurchases.length + accIncome.length) - 5} more transactions</p>
+                                                ` : ''}
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+
+                        <div class="border-t ${d ? 'border-gray-700' : 'border-gray-200'} pt-6">
+                            <h3 class="text-xl font-bold ${d ? 'text-white' : 'text-gray-800'} mb-4">Add New Account</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <input id="newAccName" type="text" placeholder="Account Name" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-300'} rounded-xl">
+                                <input id="newAccBal" type="number" placeholder="Balance" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-300'} rounded-xl">
+                                <button onclick="addAccount()" class="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl">
+                                    ➕ Add Account
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                ` : state.activeTab === 'purchases' ? `
+                    <div class="${d ? 'bg-gray-800 border border-gray-700' : 'bg-white'} rounded-2xl shadow-xl p-6">
+                        <h2 class="text-2xl font-bold ${d ? 'text-pink-400' : 'text-pink-600'} mb-6">🧾 Purchase Tracker</h2>
+                        
+                        <div class="space-y-3 mb-6">
+                            ${state.purchases.map(p => `
+                                <div class="${d ? 'bg-gray-700' : 'bg-pink-50'} p-4 rounded-xl flex justify-between items-center">
+                                    <div>
+                                        <p class="font-bold ${d ? 'text-white' : 'text-gray-800'}">${p.item}</p>
+                                        <p class="text-sm ${d ? 'text-gray-400' : 'text-gray-600'}">📅 ${p.date} • 💳 ${p.account} ${p.category ? '• ' + p.category : ''}</p>
+                                    </div>
+                                    <div class="flex items-center gap-4">
+                                        <p class="text-2xl font-bold text-pink-600">$${p.amount.toFixed(2)}</p>
+                                        <button onclick="deleteItem('purchases', ${p.id})" class="text-red-500 hover:text-red-700">🗑️</button>
+                                    </div>
+                                </div>
+                            `).join('') || `<p class="${d ? 'text-gray-400' : 'text-gray-500'} text-center py-8">No purchases logged yet</p>`}
+                        </div>
+
+                        <div class="border-t ${d ? 'border-gray-700' : 'border-gray-200'} pt-6">
+                            <h3 class="text-xl font-bold ${d ? 'text-white' : 'text-gray-800'} mb-4">Log New Purchase</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <input id="pDate" type="date" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'} rounded-xl">
+                                <input id="pItem" type="text" placeholder="Item" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-300'} rounded-xl">
+                                <input id="pAmt" type="number" placeholder="Amount" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-300'} rounded-xl">
+                                <select id="pAcc" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'} rounded-xl">
+                                    <option value="">Select Account</option>
+                                    ${state.accounts.map(a => `<option value="${a.name}">${a.name}</option>`).join('')}
+                                </select>
+                                <input id="pCat" type="text" placeholder="Category (Optional)" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-300'} rounded-xl">
+                                <button onclick="addPurchase()" class="bg-pink-600 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl">
+                                    ➕ Log Purchase
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                ` : state.activeTab === 'budget' ? `
+                    <div class="space-y-6">
+                        <!-- Actual Income Tracking -->
+                        <div class="${d ? 'bg-gray-800 border border-gray-700' : 'bg-white'} rounded-2xl shadow-xl p-6">
+                            <h2 class="text-2xl font-bold ${d ? 'text-green-400' : 'text-green-600'} mb-4">💵 Actual Income Tracking</h2>
+                            <p class="${d ? 'text-gray-400' : 'text-gray-600'} mb-6">Log your exact paycheck amounts, bonuses, gifts, and other income</p>
+                            
+                            <div class="space-y-3 mb-6 max-h-80 overflow-y-auto">
+                                ${state.incomeEntries.map(e => `
+                                    <div class="${d ? 'bg-gray-700' : 'bg-green-50'} p-4 rounded-xl flex justify-between items-center">
+                                        <div>
+                                            <div class="flex items-center gap-3">
+                                                <p class="font-semibold ${d ? 'text-white' : 'text-gray-800'}">${e.source}</p>
+                                                <span class="text-xs bg-green-200 text-green-800 px-2 py-1 rounded-full font-semibold">${e.category}</span>
+                                            </div>
+                                            <p class="text-sm ${d ? 'text-gray-400' : 'text-gray-600'} mt-1">📅 ${e.date} ${e.account ? '• 💳 ' + e.account : ''}</p>
+                                        </div>
+                                        <div class="flex items-center gap-4">
+                                            <p class="text-2xl font-bold text-green-600">${e.amount.toFixed(2)}</p>
+                                            <button onclick="deleteItem('incomeEntries', ${e.id})" class="text-red-500 hover:text-red-700">🗑️</button>
+                                        </div>
+                                    </div>
+                                `).join('') || `<p class="${d ? 'text-gray-400' : 'text-gray-500'} text-center py-4">No income entries yet</p>`}
+                            </div>
+
+                            <div class="${d ? 'bg-gray-700' : 'bg-green-100'} p-4 rounded-xl mb-6">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-lg font-semibold ${d ? 'text-gray-200' : 'text-gray-700'}">Total Actual Income:</span>
+                                    <span class="text-3xl font-bold text-green-600">${calcTotals().totalIncome.toFixed(2)}</span>
+                                </div>
+                            </div>
+
+                            <div class="border-t ${d ? 'border-gray-700' : 'border-gray-200'} pt-6">
+                                <h3 class="text-xl font-bold ${d ? 'text-white' : 'text-gray-800'} mb-4">Log New Income</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
+                                    <input id="incSource" type="text" placeholder="Source" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-300'} rounded-xl">
+                                    <input id="incAmt" type="number" placeholder="Amount" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-300'} rounded-xl">
+                                    <input id="incDate" type="date" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'} rounded-xl">
+                                    <select id="incCat" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'} rounded-xl">
+                                        <option value="Salary">Salary/Paycheck</option>
+                                        <option value="Bonus">Bonus</option>
+                                        <option value="Gift">Gift</option>
+                                        <option value="Side Income">Side Income</option>
+                                        <option value="Tax Refund">Tax Refund</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                    <select id="incAcc" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'} rounded-xl">
+                                        <option value="">Deposit Account</option>
+                                        ${state.accounts.map(a => `<option value="${a.name}">${a.name}</option>`).join('')}
+                                    </select>
+                                    <button onclick="addIncomeEntry()" class="bg-green-600 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl">
+                                        ➕ Log Income
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Expenses Section -->
+                        <div class="${d ? 'bg-gray-800 border border-gray-700' : 'bg-white'} rounded-2xl shadow-xl p-6">
+                            <h2 class="text-2xl font-bold ${d ? 'text-red-400' : 'text-red-600'} mb-6">📊 Expenses (${state.timeframe})</h2>
+                            
+                            <div class="space-y-3 mb-6">
+                                ${state.expenses.map(e => {
+                                    const today = new Date();
+                                    const due = e.dueDate ? new Date(e.dueDate) : null;
+                                    const daysUntil = due ? Math.ceil((due - today) / (1000*60*60*24)) : null;
+                                    const isOverdue = daysUntil !== null && daysUntil < 0;
+                                    const isDueSoon = daysUntil !== null && daysUntil >= 0 && daysUntil <= 7;
+                                    
+                                    return `
+                                        <div class="${d ? 'bg-gray-700' : 'bg-red-50'} p-4 rounded-xl">
+                                            <div class="flex justify-between items-center">
+                                                <div class="flex-1">
+                                                    <div class="flex items-center gap-3">
+                                                        <p class="font-semibold ${d ? 'text-white' : 'text-gray-800'}">${e.category}</p>
+                                                        ${e.dueDate ? `
+                                                            <span class="text-xs px-2 py-1 rounded-full font-semibold ${
+                                                                isOverdue ? 'bg-red-200 text-red-800' :
+                                                                isDueSoon ? 'bg-yellow-200 text-yellow-800' : 
+                                                                'bg-gray-200 text-gray-700'
+                                                            }">
+                                                                ${isOverdue ? 'Overdue ' + Math.abs(daysUntil) + ' days' :
+                                                                  isDueSoon ? 'Due in ' + daysUntil + ' days' :
+                                                                  'Due ' + e.dueDate}
+                                                            </span>
+                                                        ` : ''}
+                                                    </div>
+                                                    <p class="text-sm ${d ? 'text-gray-400' : 'text-gray-600'} mt-1">${e.frequency}</p>
+                                                </div>
+                                                <div class="flex items-center gap-4">
+                                                    <p class="text-2xl font-bold text-red-600">${e.amount.toFixed(2)}</p>
+                                                    <button onclick="deleteItem('expenses', ${e.id})" class="text-red-500 hover:text-red-700">🗑️</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('') || `<p class="${d ? 'text-gray-400' : 'text-gray-500'} text-center py-4">No expenses yet</p>`}
+                            </div>
+
+                            <div class="border-t ${d ? 'border-gray-700' : 'border-gray-200'} pt-6">
+                                <h3 class="text-xl font-bold ${d ? 'text-white' : 'text-gray-800'} mb-4">Add Expense</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                                    <input id="expCat" type="text" placeholder="Category" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-300'} rounded-xl">
+                                    <input id="expAmt" type="number" placeholder="Amount" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-300'} rounded-xl">
+                                    <select id="expFreq" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'} rounded-xl">
+                                        <option value="daily">Daily</option>
+                                        <option value="weekly">Weekly</option>
+                                        <option value="biweekly">Bi-Weekly</option>
+                                        <option value="monthly">Monthly</option>
+                                        <option value="quarterly">Quarterly</option>
+                                    </select>
+                                    <input id="expDue" type="date" placeholder="Due Date" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'} rounded-xl">
+                                    <button onclick="addExpense()" class="bg-red-600 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl">
+                                        ➕ Add Expense
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                ` : state.activeTab === 'goals' ? `
+                    <div class="${d ? 'bg-gray-800 border border-gray-700' : 'bg-white'} rounded-2xl shadow-xl p-6">
+                        <h2 class="text-2xl font-bold ${d ? 'text-blue-400' : 'text-blue-600'} mb-2">🎯 Funding My Future</h2>
+                        <p class="${d ? 'text-gray-400' : 'text-gray-600'} mb-6">Savings Goals</p>
+                        
+                        <div class="space-y-6 mb-6">
+                            ${state.savingsGoals.map(g => {
+                                const prog = (g.current / g.target) * 100;
+                                return `
+                                    <div class="${d ? 'bg-gray-700' : 'bg-blue-50'} p-6 rounded-xl">
+                                        <div class="flex justify-between items-start mb-3">
+                                            <div>
+                                                <h3 class="text-xl font-bold ${d ? 'text-white' : 'text-gray-800'}">${g.name}</h3>
+                                                <p class="text-sm ${d ? 'text-gray-400' : 'text-gray-600'}">Target: ${g.target.toFixed(2)} • Due: ${g.deadline}</p>
+                                            </div>
+                                            <button onclick="deleteItem('savingsGoals', ${g.id})" class="text-red-500 hover:text-red-700">🗑️</button>
+                                        </div>
+                                        <div class="mb-2">
+                                            <div class="flex justify-between text-sm mb-1">
+                                                <span class="font-semibold ${d ? 'text-gray-300' : 'text-gray-700'}">${g.current.toFixed(2)}</span>
+                                                <span class="font-semibold ${d ? 'text-gray-300' : 'text-gray-700'}">${prog.toFixed(1)}%</span>
+                                            </div>
+                                            <div class="w-full bg-gray-200 rounded-full h-4">
+                                                <div class="bg-gradient-to-r from-blue-500 to-blue-600 h-4 rounded-full" style="width: ${Math.min(prog, 100)}%"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('') || `<p class="${d ? 'text-gray-400' : 'text-gray-500'} text-center py-8">No savings goals yet</p>`}
+                        </div>
+
+                        <div class="border-t ${d ? 'border-gray-700' : 'border-gray-200'} pt-6">
+                            <h3 class="text-xl font-bold ${d ? 'text-white' : 'text-gray-800'} mb-4">Add Savings Goal</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+                                <input id="goalName" type="text" placeholder="Goal Name" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-300'} rounded-xl">
+                                <input id="goalTarget" type="number" placeholder="Target Amount" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-300'} rounded-xl">
+                                <input id="goalCurrent" type="number" placeholder="Current Amount" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-300'} rounded-xl">
+                                <input id="goalDeadline" type="date" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'} rounded-xl">
+                                <button onclick="addGoal()" class="bg-blue-600 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl">
+                                    ➕ Add Goal
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                ` : state.activeTab === 'debts' ? `
+                    <div class="${d ? 'bg-gray-800 border border-gray-700' : 'bg-white'} rounded-2xl shadow-xl p-6">
+                        <h2 class="text-2xl font-bold ${d ? 'text-orange-400' : 'text-orange-600'} mb-6">⚠️ Debt Tracking</h2>
+                        
+                        <div class="space-y-4 mb-6">
+                            ${state.debts.map(debt => `
+                                <div class="${d ? 'bg-gray-700' : 'bg-orange-50'} p-6 rounded-xl border-l-4 border-orange-500">
+                                    <div class="flex justify-between items-start mb-3">
+                                        <div class="flex-1">
+                                            <div class="flex items-center gap-3 mb-2">
+                                                <h3 class="text-xl font-bold ${d ? 'text-white' : 'text-gray-800'}">${debt.creditor}</h3>
+                                                ${debt.debtType ? `<span class="px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-700">${debt.debtType}</span>` : ''}
+                                            </div>
+                                            <div class="flex gap-3 items-center flex-wrap">
+                                                <span class="px-3 py-1 rounded-full text-sm font-semibold ${
+                                                    debt.status === 'collections' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'
+                                                }">${debt.status.toUpperCase()}</span>
+                                                ${debt.dateCreated ? `<span class="text-sm ${d ? 'text-gray-400' : 'text-gray-600'}">📅 Created: ${debt.dateCreated}</span>` : ''}
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center gap-4">
+                                            <p class="text-3xl font-bold text-orange-600">${debt.amount.toFixed(2)}</p>
+                                            <button onclick="deleteItem('debts', ${debt.id})" class="text-red-500 hover:text-red-700">🗑️</button>
+                                        </div>
+                                    </div>
+                                    ${debt.notes ? `<p class="${d ? 'text-gray-300 bg-gray-600' : 'text-gray-700 bg-white'} p-3 rounded-lg mt-3">${debt.notes}</p>` : ''}
+                                </div>
+                            `).join('') || `<p class="${d ? 'text-gray-400' : 'text-gray-500'} text-center py-8">No debts tracked</p>`}
+                        </div>
+
+                        <div class="border-t ${d ? 'border-gray-700' : 'border-gray-200'} pt-6">
+                            <h3 class="text-xl font-bold ${d ? 'text-white' : 'text-gray-800'} mb-4">Add Debt</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <input id="debtCred" type="text" placeholder="Creditor Name" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-300'} rounded-xl">
+                                <select id="debtType" onchange="toggleCustomDebtType()" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'} rounded-xl">
+                                    <option value="">Debt Type</option>
+                                    <option value="Student Loans">Student Loans</option>
+                                    <option value="Credit Card">Credit Card</option>
+                                    <option value="Medical">Medical</option>
+                                    <option value="Auto Loan">Auto Loan</option>
+                                    <option value="Personal Loan">Personal Loan</option>
+                                    <option value="Mortgage">Mortgage</option>
+                                    <option value="Tax Debt">Tax Debt</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                                <input id="debtCustomType" type="text" placeholder="Specify debt type" class="px-4 py-3 border-2 border-orange-300 bg-orange-50 rounded-xl md:col-span-2" style="display: none;">
+                                <input id="debtAmt" type="number" placeholder="Amount Owed" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-300'} rounded-xl">
+                                <input id="debtDate" type="date" placeholder="Date Created" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'} rounded-xl">
+                                <select id="debtStatus" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'} rounded-xl">
+                                    <option value="active">Active</option>
+                                    <option value="collections">In Collections</option>
+                                    <option value="settled">Settled</option>
+                                </select>
+                                <input id="debtNotes" type="text" placeholder="Notes (optional)" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-300'} rounded-xl">
+                            </div>
+                            <button onclick="addDebt()" class="w-full mt-4 bg-orange-600 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl">
+                                ➕ Add Debt
+                            </button>
+                        </div>
+                    </div>
+                ` : state.activeTab === 'investments' ? `
+                    <div class="${d ? 'bg-gray-800 border border-gray-700' : 'bg-white'} rounded-2xl shadow-xl p-6">
+                        <h2 class="text-2xl font-bold ${d ? 'text-purple-400' : 'text-purple-600'} mb-6">📈 Investment Portfolio</h2>
+                        
+                        <div class="space-y-4 mb-6">
+                            ${state.investments.map(inv => `
+                                <div class="${d ? 'bg-gray-700' : 'bg-purple-50'} p-6 rounded-xl border-l-4 border-purple-500">
+                                    <div class="flex justify-between items-start mb-3">
+                                        <div>
+                                            <h3 class="text-xl font-bold ${d ? 'text-white' : 'text-gray-800'}">${inv.name}</h3>
+                                            <div class="flex gap-2 mt-2 flex-wrap">
+                                                <span class="px-3 py-1 rounded-full text-sm font-semibold bg-purple-100 text-purple-700">${inv.type}</span>
+                                                ${inv.account ? `<span class="px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-700">💳 ${inv.account}</span>` : ''}
+                                                ${inv.contributions > 0 ? `<span class="px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-700">${inv.contributions}/${inv.frequency}</span>` : ''}
+                                            </div>
+                                        </div>
+                                        <button onclick="deleteItem('investments', ${inv.id})" class="text-red-500 hover:text-red-700">🗑️</button>
+                                    </div>
+                                    <div class="grid grid-cols-3 gap-4 mt-4">
+                                        <div class="${d ? 'bg-gray-600' : 'bg-white'} p-3 rounded-lg">
+                                            <p class="text-sm ${d ? 'text-gray-400' : 'text-gray-600'}">Value</p>
+                                            <p class="text-2xl font-bold text-purple-600">${inv.amount.toFixed(2)}</p>
+                                        </div>
+                                        <div class="${d ? 'bg-gray-600' : 'bg-white'} p-3 rounded-lg">
+                                            <p class="text-sm ${d ? 'text-gray-400' : 'text-gray-600'}">Return</p>
+                                            <p class="text-2xl font-bold text-green-600">${inv.return}%</p>
+                                        </div>
+                                        <div class="${d ? 'bg-gray-600' : 'bg-white'} p-3 rounded-lg">
+                                            <p class="text-sm ${d ? 'text-gray-400' : 'text-gray-600'}">Contribution</p>
+                                            <p class="text-2xl font-bold text-blue-600">${inv.contributions.toFixed(2)}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('') || `<p class="${d ? 'text-gray-400' : 'text-gray-500'} text-center py-8">No investments yet</p>`}
+                        </div>
+
+                        <div class="border-t ${d ? 'border-gray-700' : 'border-gray-200'} pt-6">
+                            <h3 class="text-xl font-bold ${d ? 'text-white' : 'text-gray-800'} mb-4">Add Investment</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <input id="invName" type="text" placeholder="Investment Name" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-300'} rounded-xl">
+                                <select id="invType" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'} rounded-xl">
+                                    <option value="Stocks">Stocks</option>
+                                    <option value="Bonds">Bonds</option>
+                                    <option value="Retirement">Retirement (401k/IRA)</option>
+                                    <option value="Real Estate">Real Estate</option>
+                                    <option value="Index Funds">Index Funds</option>
+                                    <option value="ETFs">ETFs</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                                <input id="invAmt" type="number" placeholder="Current Value" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-300'} rounded-xl">
+                                <input id="invReturn" type="number" placeholder="Return Rate (%)" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-300'} rounded-xl">
+                                <input id="invContrib" type="number" placeholder="Contribution Amount" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-300'} rounded-xl">
+                                <select id="invFreq" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'} rounded-xl">
+                                    <option value="weekly">Weekly</option>
+                                    <option value="biweekly">Bi-Weekly</option>
+                                    <option value="monthly">Monthly</option>
+                                    <option value="quarterly">Quarterly</option>
+                                </select>
+                                <select id="invAcc" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'} rounded-xl md:col-span-2">
+                                    <option value="">Funding Account</option>
+                                    ${state.accounts.map(a => `<option value="${a.name}">${a.name}</option>`).join('')}
+                                </select>
+                                <button onclick="addInvestment()" class="bg-purple-600 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl">
+                                    ➕ Add Investment
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                ` : state.activeTab === 'crypto' ? `
+                    <div class="${d ? 'bg-gray-800 border border-gray-700' : 'bg-white'} rounded-2xl shadow-xl p-6">
+                        <h2 class="text-2xl font-bold ${d ? 'text-yellow-400' : 'text-yellow-600'} mb-6">₿ Cryptocurrency Portfolio</h2>
+                        
+                        <div class="space-y-4 mb-6">
+                            ${state.crypto.map(c => {
+                                const val = c.quantity * c.currentPrice;
+                                const gain = (c.currentPrice - c.purchasePrice) * c.quantity;
+                                const pct = c.purchasePrice > 0 ? ((c.currentPrice - c.purchasePrice) / c.purchasePrice) * 100 : 0;
+                                return `
+                                    <div class="bg-gradient-to-r ${d ? 'from-gray-700 to-gray-600' : 'from-yellow-50 to-orange-50'} p-6 rounded-xl border-l-4 border-yellow-500">
+                                        <div class="flex justify-between items-start mb-3">
+                                            <div>
+                                                <h3 class="text-xl font-bold ${d ? 'text-white' : 'text-gray-800'}">${c.name}</h3>
+                                                <div class="flex gap-2 mt-2 flex-wrap">
+                                                    <span class="px-3 py-1 rounded-full text-sm font-semibold bg-yellow-100 text-yellow-700">${c.symbol}</span>
+                                                    ${c.platform ? `<span class="px-3 py-1 rounded-full text-sm font-semibold bg-blue-100 text-blue-700">📱 ${c.platform}</span>` : ''}
+                                                    ${c.account ? `<span class="px-3 py-1 rounded-full text-sm font-semibold bg-purple-100 text-purple-700">💳 ${c.account}</span>` : ''}
+                                                </div>
+                                            </div>
+                                            <button onclick="deleteItem('crypto', ${c.id})" class="text-red-500 hover:text-red-700">🗑️</button>
+                                        </div>
+                                        <div class="grid grid-cols-4 gap-4 mt-4">
+                                            <div class="${d ? 'bg-gray-600' : 'bg-white'} p-3 rounded-lg">
+                                                <p class="text-sm ${d ? 'text-gray-400' : 'text-gray-600'}">Quantity</p>
+                                                <p class="text-xl font-bold ${d ? 'text-white' : 'text-gray-800'}">${c.quantity}</p>
+                                            </div>
+                                            <div class="${d ? 'bg-gray-600' : 'bg-white'} p-3 rounded-lg">
+                                                <p class="text-sm ${d ? 'text-gray-400' : 'text-gray-600'}">Purchase</p>
+                                                <p class="text-xl font-bold ${d ? 'text-gray-300' : 'text-gray-600'}">${c.purchasePrice.toFixed(2)}</p>
+                                            </div>
+                                            <div class="${d ? 'bg-gray-600' : 'bg-white'} p-3 rounded-lg">
+                                                <p class="text-sm ${d ? 'text-gray-400' : 'text-gray-600'}">Current</p>
+                                                <p class="text-xl font-bold text-blue-600">${c.currentPrice.toFixed(2)}</p>
+                                            </div>
+                                            <div class="${d ? 'bg-gray-600' : 'bg-white'} p-3 rounded-lg">
+                                                <p class="text-sm ${d ? 'text-gray-400' : 'text-gray-600'}">Total</p>
+                                                <p class="text-xl font-bold text-yellow-600">${val.toFixed(2)}</p>
+                                            </div>
+                                        </div>
+                                        <div class="mt-4 p-3 rounded-lg ${gain >= 0 ? 'bg-green-100' : 'bg-red-100'}">
+                                            <div class="flex justify-between items-center">
+                                                <span class="font-semibold text-gray-700">Gain/Loss</span>
+                                                <div class="text-right">
+                                                    <p class="text-xl font-bold ${gain >= 0 ? 'text-green-600' : 'text-red-600'}">
+                                                        ${gain >= 0 ? '+' : ''}${pct.toFixed(2)}%
+                                                    </p>
+                                                    <p class="text-lg ${gain >= 0 ? 'text-green-600' : 'text-red-600'}">
+                                                        ${gain >= 0 ? '+' : ''}${gain.toFixed(2)}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('') || `<p class="${d ? 'text-gray-400' : 'text-gray-500'} text-center py-8">No crypto holdings yet</p>`}
+                        </div>
+
+                        <div class="border-t ${d ? 'border-gray-700' : 'border-gray-200'} pt-6">
+                            <h3 class="text-xl font-bold ${d ? 'text-white' : 'text-gray-800'} mb-4">Add Cryptocurrency</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <input id="cryptoName" type="text" placeholder="Crypto Name" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-300'} rounded-xl">
+                                <input id="cryptoSymbol" type="text" placeholder="Symbol (e.g., BTC)" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-300'} rounded-xl">
+                                <input id="cryptoPlatform" type="text" placeholder="Platform" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-300'} rounded-xl">
+                                <input id="cryptoQty" type="number" placeholder="Quantity" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-300'} rounded-xl">
+                                <input id="cryptoPurchase" type="number" placeholder="Purchase Price" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-300'} rounded-xl">
+                                <input id="cryptoCurrent" type="number" placeholder="Current Price" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' : 'border-gray-300'} rounded-xl">
+                                <select id="cryptoAcc" class="px-4 py-3 border-2 ${d ? 'bg-gray-700 border-gray-600 text-white' : 'border-gray-300'} rounded-xl">
+                                    <option value="">Funding Account</option>
+                                    ${state.accounts.map(a => `<option value="${a.name}">${a.name}</option>`).join('')}
+                                </select>
+                                <button onclick="addCrypto()" class="bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl md:col-span-2">
+                                    ➕ Add Crypto
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                ` : `
+                    <div class="${d ? 'bg-gray-800 border border-gray-700 text-white' : 'bg-white text-gray-800'} rounded-2xl shadow-xl p-8">
+                        <h2 class="text-2xl font-bold mb-4">${state.activeTab === 'goals' ? 'Funding My Future' : state.activeTab.charAt(0).toUpperCase() + state.activeTab.slice(1)}</h2>
+                        <p class="${d ? 'text-gray-400' : 'text-gray-600'}">This section is coming soon. Use Dashboard, Ledger, Budget, and Purchases for now.</p>
+                        <p class="${d ? 'text-gray-500' : 'text-gray-500'} text-sm mt-4">All your data is automatically saving with localStorage!</p>
+                    </div>
+                `}
+            `;
+            
+            save();
+        }
+
+        function addAccount() {
+            const name = document.getElementById('newAccName').value;
+            const bal = parseFloat(document.getElementById('newAccBal').value) || 0;
+            if (!name) return alert('Please enter account name');
+            
+            const colors = ['#EC4899', '#8B5CF6', '#10B981', '#F59E0B', '#EF4444', '#3B82F6'];
+            state.accounts.push({
+                id: Date.now(),
+                name: name,
+                balance: bal,
+                color: colors[state.accounts.length % colors.length]
+            });
+            document.getElementById('newAccName').value = '';
+            document.getElementById('newAccBal').value = '';
             render();
         }
 
         // Initialize
-        loadData();
+        document.getElementById('body').className = state.darkMode 
+            ? 'min-h-screen p-4 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900'
+            : 'min-h-screen p-4 bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50';
         render();
     </script>
 </body>
